@@ -1,5 +1,8 @@
+import React from 'react';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
+import { Button } from '@aiostreams/ui/button';
+import { cn } from '@aiostreams/ui/core/styling';
 import { Skeleton } from '@aiostreams/ui/skeleton';
 import { LuffyError } from '@aiostreams/ui/shared/luffy-error';
 import { useSession } from '@/lib/jellyfin/session';
@@ -8,7 +11,10 @@ import { posterUrl } from '@/lib/artwork/urls';
 import { dateFormat, yearsBetween } from '@/lib/format';
 import { useInView } from '@/hooks/use-in-view';
 import { PageBody, PageMessage } from '@/components/shell/page';
-import { MixedGrid } from '@/components/media/mixed-grid';
+import { Scores } from '@/components/media/scores';
+import { Anchor } from '@/components/anchor';
+import { href, itemPath } from '@/lib/paths';
+import { useSearchParam } from '@/hooks/use-search-param';
 import { ExternalLinks } from '@/components/media/external-links';
 import { Overview } from '@/components/media/overview';
 import { KindTabs, useKindParam } from '@/components/media/kind-tabs';
@@ -105,12 +111,277 @@ function Header({ person }: { person: BaseItemDto }) {
   );
 }
 
-function Filmography({ personId }: { personId: string }) {
+/** How many titles of a kind of work the server counted, by movies and shows. */
+interface CreditCount {
+  type: string;
+  movies: number;
+  series: number;
+}
+
+/** The person's kinds of work with their counts, and the kind TMDB knows them for. */
+function creditsOf(person: BaseItemDto | undefined): {
+  credits: CreditCount[];
+  knownFor?: string;
+} {
+  const extension = (
+    person as
+      | { aiostreams?: { credits?: CreditCount[]; knownFor?: string } }
+      | undefined
+  )?.aiostreams;
+  return {
+    credits: extension?.credits ?? [],
+    knownFor: extension?.knownFor,
+  };
+}
+
+/** A kind of work's name as a filter; any the server names by TMDB's department keeps that. */
+function workLabel(kind: string): string {
+  switch (kind) {
+    case 'Actor':
+      return t`Acting`;
+    case 'Director':
+      return t`Directing`;
+    case 'Writer':
+      return t`Writing`;
+    case 'Composer':
+      return t({ comment: 'A person’s work on scores', message: 'Music' });
+    case 'Producer':
+      return t`Producing`;
+    case 'Editor':
+      return t`Editing`;
+    default:
+      return kind;
+  }
+}
+
+/** Crew kinds a title page names that a person's page counts under another. */
+// eslint-disable-next-line lingui/no-unlocalized-strings -- Jellyfin's person kinds
+const SAME_WORK: Record<string, string> = {
+  Creator: 'Writer',
+  GuestStar: 'Actor',
+};
+/** Every kind of work, the filters all off. */
+const ALL_WORK = 'all';
+
+/**
+ * The kinds of work shown, kept in the address: the one a link asked for,
+ * else the one TMDB knows them for, else their most.
+ */
+function useWorkParam(
+  credits: CreditCount[],
+  knownFor: string | undefined
+): [string[], (next: string[]) => void] {
+  const [param, setParam] = useSearchParam('role');
+  const counted = new Set(credits.map((c) => c.type));
+  const fallback =
+    knownFor && counted.has(knownFor) ? knownFor : credits[0]?.type;
+  const asked = (param ?? '')
+    .split(',')
+    .map((kind) => SAME_WORK[kind] ?? kind)
+    .filter((kind) => counted.has(kind));
+  const shown =
+    !credits.length || param === ALL_WORK
+      ? []
+      : asked.length
+        ? asked
+        : fallback
+          ? [fallback]
+          : [];
+  return [
+    shown,
+    (next) =>
+      setParam(
+        !next.length
+          ? ALL_WORK
+          : next.length === 1 && next[0] === fallback
+            ? undefined
+            : next.join(',')
+      ),
+  ];
+}
+
+function countIn(count: CreditCount, types: string): number {
+  if (types === 'Movie') return count.movies;
+  if (types === 'Series') return count.series;
+  return count.movies + count.series;
+}
+
+/** Kinds of work as filters, each turned on and off on its own. */
+function WorkFilters({
+  credits,
+  types,
+  shown,
+  onChange,
+}: {
+  credits: CreditCount[];
+  types: string;
+  shown: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const offered = credits.filter(
+    (c) => countIn(c, types) > 0 || shown.includes(c.type)
+  );
+  if (offered.length < 2 && !shown.length) return null;
+  return (
+    <div
+      data-ui="work-filters"
+      role="group"
+      aria-label={t`Kinds of work`}
+      className="flex flex-wrap gap-2"
+    >
+      {offered.map((count) => {
+        const on = shown.includes(count.type);
+        return (
+          <Button
+            key={count.type}
+            data-ui="work-filter"
+            data-name={count.type}
+            data-selected={on || undefined}
+            aria-pressed={on}
+            size="sm"
+            intent={on ? 'white' : 'gray-subtle'}
+            className="rounded-full"
+            onClick={() =>
+              onChange(
+                on
+                  ? shown.filter((kind) => kind !== count.type)
+                  : [...shown, count.type]
+              )
+            }
+          >
+            {workLabel(count.type)}
+            <span
+              className={cn(
+                'ms-1.5 tabular-nums',
+                on ? 'text-black/60' : 'text-[--muted]'
+              )}
+            >
+              {countIn(count, types)}
+            </span>
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
+
+function yearOf(item: BaseItemDto): number | undefined {
+  if (item.ProductionYear) return item.ProductionYear;
+  return item.PremiereDate
+    ? new Date(item.PremiereDate).getFullYear()
+    : undefined;
+}
+
+/** Runs of titles from one year, in the order the server sent them. */
+function byYear(
+  items: BaseItemDto[]
+): { year: number | undefined; items: BaseItemDto[] }[] {
+  const years: { year: number | undefined; items: BaseItemDto[] }[] = [];
+  for (const item of items) {
+    const year = yearOf(item);
+    const last = years.at(-1);
+    if (last && last.year === year) last.items.push(item);
+    else years.push({ year, items: [item] });
+  }
+  return years;
+}
+
+/** What the person did on a title, of the kinds shown where any are. */
+function partsOf(item: BaseItemDto, shown: string[]): string[] {
+  const people = item.People ?? [];
+  const matching = shown.length
+    ? people.filter((p) => shown.includes(String(p.Type)))
+    : people;
+  const parts = (matching.length ? matching : people).map(
+    (p) => p.Role || workLabel(String(p.Type ?? ''))
+  );
+  return [...new Set(parts.filter(Boolean))];
+}
+
+function CreditRow({ item, shown }: { item: BaseItemDto; shown: string[] }) {
   const { client } = useSession();
+  const poster = posterUrl(client, item, { maxWidth: 96 });
+  const parts = partsOf(item, shown);
+  return (
+    <li>
+      <Anchor
+        data-ui="credit"
+        href={href(itemPath(item))}
+        className="group flex items-center gap-4 rounded-lg px-2 py-2 transition-colors hover:bg-white/5 focus-visible:bg-white/10"
+      >
+        <div
+          data-ui="credit-poster"
+          className="aspect-[2/3] w-10 flex-none overflow-hidden rounded bg-gray-900 ring-1 ring-white/10 sm:w-12"
+        >
+          {poster && (
+            <CachedImage
+              src={poster}
+              alt=""
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p
+            data-ui="credit-title"
+            className="truncate font-medium group-hover:underline"
+          >
+            {item.Name}
+            {item.Type === 'Series' && (
+              <span className="ms-2 text-xs font-normal text-[--muted]">
+                <Trans>Show</Trans>
+              </span>
+            )}
+          </p>
+          {parts.length > 0 && (
+            <p
+              data-ui="credit-part"
+              className="truncate text-sm text-[--muted]"
+            >
+              {parts.join(' · ')}
+            </p>
+          )}
+        </div>
+        <div data-ui="credit-score" className="flex-none text-sm">
+          <Scores item={item} max={1} />
+        </div>
+      </Anchor>
+    </li>
+  );
+}
+
+function CreditsSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i} className="flex items-center gap-4 px-2">
+          <Skeleton className="aspect-[2/3] h-auto w-10 rounded sm:w-12" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-3 w-1/3" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Filmography({
+  personId,
+  person,
+}: {
+  personId: string;
+  person: BaseItemDto | undefined;
+}) {
   const [types, setTypes] = useKindParam();
-  const pages = usePersonItems(personId, types);
+  const { credits, knownFor } = creditsOf(person);
+  const [shown, setShown] = useWorkParam(credits, knownFor);
+  // Once the person is in, so the list starts on their kind of work.
+  const pages = usePersonItems(personId, types, shown, !!person);
   const items = pages.data?.pages.flatMap((p) => p.Items ?? []) ?? [];
   const total = pages.data?.pages[0]?.TotalRecordCount;
+  const years = React.useMemo(() => byYear(items), [items]);
   // Keyed on pages, not items: a page can hold nothing this setup can open.
   const sentinel = useInView<HTMLDivElement>(
     () => {
@@ -118,10 +389,10 @@ function Filmography({ personId }: { personId: string }) {
         void pages.fetchNextPage();
     },
     '800px',
-    [pages.data?.pages.length, types]
+    [pages.data?.pages.length, types, shown.join(',')]
   );
   return (
-    <section data-ui="section" data-name="filmography" className="space-y-4">
+    <section data-ui="section" data-name="filmography" className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 data-ui="section-title" className="text-xl font-semibold">
           <Trans>Filmography</Trans>
@@ -133,21 +404,48 @@ function Filmography({ personId }: { personId: string }) {
         </h2>
         <KindTabs types={types} onChange={setTypes} />
       </div>
+      <WorkFilters
+        credits={credits}
+        types={types}
+        shown={shown}
+        onChange={setShown}
+      />
       {pages.isError ? (
         <LuffyError title={t`Could not load their work`} />
+      ) : pages.isLoading || !person ? (
+        <CreditsSkeleton />
+      ) : !items.length ? (
+        <p className="text-[--muted]">
+          <Trans>Nothing found.</Trans>
+        </p>
       ) : (
-        <>
-          <MixedGrid items={items} client={client} loading={pages.isLoading} />
-          {!pages.isLoading && !items.length && (
-            <p className="text-[--muted]">
-              <Trans>Nothing found.</Trans>
-            </p>
-          )}
-        </>
+        <div data-ui="credits" className="max-w-4xl space-y-6">
+          {years.map(({ year, items: titles }, i) => (
+            <section
+              key={`${year ?? 'none'}-${i}`}
+              data-ui="credit-year"
+              className="grid gap-x-6 gap-y-1 sm:grid-cols-[4.5rem_1fr]"
+            >
+              <h3
+                data-ui="credit-year-title"
+                className="text-2xl font-bold tabular-nums text-gray-400 sm:sticky sm:top-[calc(var(--top-bar,0px)+1rem)] sm:self-start sm:pt-2"
+              >
+                {year ?? (
+                  <span className="text-base font-semibold">
+                    <Trans>To be announced</Trans>
+                  </span>
+                )}
+              </h3>
+              <ol className="divide-y divide-white/5 border-t border-white/10 sm:border-t-0">
+                {titles.map((item) => (
+                  <CreditRow key={item.Id} item={item} shown={shown} />
+                ))}
+              </ol>
+            </section>
+          ))}
+        </div>
       )}
-      {pages.isFetchingNextPage && (
-        <Skeleton className="h-40 w-full rounded-xl" />
-      )}
+      {pages.isFetchingNextPage && <CreditsSkeleton />}
       <div ref={sentinel} />
     </section>
   );
@@ -177,7 +475,7 @@ export function PersonPage({ personId }: { personId: string }) {
           </div>
         </div>
       )}
-      <Filmography personId={personId} />
+      <Filmography personId={personId} person={person.data} />
     </PageBody>
   );
 }

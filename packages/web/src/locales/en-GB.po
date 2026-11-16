@@ -55,13 +55,29 @@ msgstr "{count, plural, one {Added # badge} other {Added # badges}}"
 msgid "{count, plural, one {Added # quick filter} other {Added # quick filters}}"
 msgstr "{count, plural, one {Added # quick filter} other {Added # quick filters}}"
 
+#: src/components/media/people.tsx
+msgid "{count, plural, one {Creator} other {Creators}}"
+msgstr "{count, plural, one {Creator} other {Creators}}"
+
+#: src/components/media/people.tsx
+msgid "{count, plural, one {Director} other {Directors}}"
+msgstr "{count, plural, one {Director} other {Directors}}"
+
 #: src/lib/downloads/index.ts
 msgid "{count, plural, one {Download added} other {# downloads added}}"
 msgstr "{count, plural, one {Download added} other {# downloads added}}"
 
+#: src/components/media/people.tsx
+msgid "{count, plural, one {Producer} other {Producers}}"
+msgstr "{count, plural, one {Producer} other {Producers}}"
+
 #: src/app/item/_components/trailers.tsx
 msgid "{count, plural, one {Trailer} other {Trailers}}"
 msgstr "{count, plural, one {Trailer} other {Trailers}}"
+
+#: src/components/media/people.tsx
+msgid "{count, plural, one {Writer} other {Writers}}"
+msgstr "{count, plural, one {Writer} other {Writers}}"
 
 #: src/app/downloads/page.tsx
 msgid "{downloaded} downloaded"
@@ -146,6 +162,10 @@ msgstr "{members, plural, one {# watching} other {# watching}}"
 #: src/lib/format.ts
 msgid "{minutes}m"
 msgstr "{minutes}m"
+
+#: src/components/media/people.tsx
+msgid "{more, plural, one {and # more} other {and # more}}"
+msgstr "{more, plural, one {and # more} other {and # more}}"
 
 #: src/app/history/page.tsx
 msgid "{movieCount, plural, one {# movie watched} other {# movies watched}}"
@@ -403,6 +423,10 @@ msgstr "Account"
 #: src/app/settings/cache.tsx
 msgid "Account and server"
 msgstr "Account and server"
+
+#: src/app/person/page.tsx
+msgid "Acting"
+msgstr "Acting"
 
 #: src/app/history/page.tsx
 msgid "Actions"
@@ -1050,10 +1074,6 @@ msgstr "Commentary"
 msgid "Compatibility"
 msgstr "Compatibility"
 
-#: src/components/media/people.tsx
-msgid "Composer"
-msgstr "Composer"
-
 #: src/app/settings/account.tsx
 msgid "Configuration"
 msgstr "Configuration"
@@ -1284,10 +1304,6 @@ msgstr "Counts down, then plays the next episode. Off, the prompt waits for you.
 msgid "Create"
 msgstr "Create"
 
-#: src/components/media/people.tsx
-msgid "Creator"
-msgstr "Creator"
-
 #: src/app/settings/playback.tsx
 msgid "Credits"
 msgstr "Credits"
@@ -1453,9 +1469,9 @@ msgstr "Died {date}"
 msgid "Died {date} (aged {age})"
 msgstr "Died {date} (aged {age})"
 
-#: src/components/media/people.tsx
-msgid "Director"
-msgstr "Director"
+#: src/app/person/page.tsx
+msgid "Directing"
+msgstr "Directing"
 
 #: src/app/settings/apps.tsx
 msgid "Discord"
@@ -1616,6 +1632,10 @@ msgstr "Each filter shows as a pill above the version list. Its search is words 
 #: src/app/settings/_components/version-settings.tsx
 msgid "Edit"
 msgstr "Edit"
+
+#: src/app/person/page.tsx
+msgid "Editing"
+msgstr "Editing"
 
 #: src/features/player/controls.tsx
 msgid "Ends at {endsAt}"
@@ -2254,6 +2274,10 @@ msgstr "Keyboard shortcuts"
 msgid "Keys, remotes and gamepads"
 msgstr "Keys, remotes and gamepads"
 
+#: src/app/person/page.tsx
+msgid "Kinds of work"
+msgstr "Kinds of work"
+
 #: src/app/settings/_components/version-settings.tsx
 msgid "Label"
 msgstr "Label"
@@ -2578,6 +2602,13 @@ msgstr "mpv inside this window, with this app's controls and playback settings. 
 #: src/app/settings/apps.tsx
 msgid "mpv.conf, input.conf, scripts and shaders in this folder apply to the built-in mpv."
 msgstr "mpv.conf, input.conf, scripts and shaders in this folder apply to the built-in mpv."
+
+#. A person’s work on scores
+#. Heading over who wrote a title’s score
+#: src/app/person/page.tsx
+#: src/components/media/people.tsx
+msgid "Music"
+msgstr "Music"
 
 #: src/features/player/picture-in-picture.tsx
 #: src/features/player/volume.tsx
@@ -3630,9 +3661,9 @@ msgstr "Previous track"
 msgid "Previous trailer"
 msgstr "Previous trailer"
 
-#: src/components/media/people.tsx
-msgid "Producer"
-msgstr "Producer"
+#: src/app/person/page.tsx
+msgid "Producing"
+msgstr "Producing"
 
 #: src/app/settings/_components/shortcut-settings.tsx
 msgid "Puts every key back the way it came."
@@ -4230,6 +4261,10 @@ msgstr "Shift"
 #: src/app/settings/page.tsx
 msgid "Shortcuts"
 msgstr "Shortcuts"
+
+#: src/app/person/page.tsx
+msgid "Show"
+msgstr "Show"
 
 #. A dot under the banner that brings this title up
 #: src/components/media/hero.tsx
@@ -5276,6 +5311,10 @@ msgstr "Title pages"
 msgid "Titles, synopses and version names stay in the language the server sends."
 msgstr "Titles, synopses and version names stay in the language the server sends."
 
+#: src/app/person/page.tsx
+msgid "To be announced"
+msgstr "To be announced"
+
 #: src/app/calendar/page.tsx
 #: src/app/live-tv/page.tsx
 msgid "Today"
@@ -5876,9 +5915,9 @@ msgstr "With a finger or the mouse button, at the held speed."
 msgid "Words or /pattern/"
 msgstr "Words or /pattern/"
 
-#: src/components/media/people.tsx
-msgid "Writer"
-msgstr "Writer"
+#: src/app/person/page.tsx
+msgid "Writing"
+msgstr "Writing"
 
 #: src/app/settings/interface.tsx
 msgid "Year"
