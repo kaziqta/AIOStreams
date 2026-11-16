@@ -115,7 +115,7 @@ function lookOf(source: string, share: number): Look {
 }
 /* eslint-enable lingui/no-unlocalized-strings */
 
-export function ScoreBadge({ score }: { score: Score }) {
+function ScoreBadge({ score }: { score: Score }) {
   const share = score.value / score.scale;
   const { name, icon: Icon, color, text } = lookOf(score.source, share);
   return (

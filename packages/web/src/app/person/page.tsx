@@ -1,8 +1,10 @@
 import React from 'react';
 import { plural, t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
-import { Button } from '@aiostreams/ui/button';
-import { cn } from '@aiostreams/ui/core/styling';
+import { BiInfoCircle } from 'react-icons/bi';
+import { IoStar } from 'react-icons/io5';
+import { LuListFilter } from 'react-icons/lu';
+import { Combobox } from '@aiostreams/ui/combobox';
 import { Skeleton } from '@aiostreams/ui/skeleton';
 import { LuffyError } from '@aiostreams/ui/shared/luffy-error';
 import { useSession } from '@/lib/jellyfin/session';
@@ -11,7 +13,7 @@ import { posterUrl } from '@/lib/artwork/urls';
 import { dateFormat, yearsBetween } from '@/lib/format';
 import { useInView, useNear } from '@/hooks/use-in-view';
 import { PageBody, PageMessage } from '@/components/shell/page';
-import { ScoreBadge, scoresOf } from '@/components/media/scores';
+import { scoresOf } from '@/components/media/scores';
 import { Anchor } from '@/components/anchor';
 import { href, itemPath } from '@/lib/paths';
 import { useSearchParam } from '@/hooks/use-search-param';
@@ -206,7 +208,10 @@ function countIn(count: CreditCount, types: string): number {
   return count.movies + count.series;
 }
 
-/** Kinds of work as filters, each turned on and off on its own. */
+/**
+ * Kinds of work as one picker, so a remote passes one control rather than a
+ * pill for each; the ones on show as chips in it, each with its own remove.
+ */
 function WorkFilters({
   credits,
   types,
@@ -223,45 +228,23 @@ function WorkFilters({
   );
   if (offered.length < 2 && !shown.length) return null;
   return (
-    <div
+    <Combobox
       data-ui="work-filters"
-      role="group"
       aria-label={t`Kinds of work`}
-      className="flex flex-wrap gap-2"
-    >
-      {offered.map((count) => {
-        const on = shown.includes(count.type);
-        return (
-          <Button
-            key={count.type}
-            data-ui="work-filter"
-            data-name={count.type}
-            data-selected={on || undefined}
-            aria-pressed={on}
-            size="sm"
-            intent={on ? 'white' : 'gray-subtle'}
-            className="rounded-full"
-            onClick={() =>
-              onChange(
-                on
-                  ? shown.filter((kind) => kind !== count.type)
-                  : [...shown, count.type]
-              )
-            }
-          >
-            {workLabel(count.type)}
-            <span
-              className={cn(
-                'ms-1.5 tabular-nums',
-                on ? 'text-black/60' : 'text-[--muted]'
-              )}
-            >
-              {countIn(count, types)}
-            </span>
-          </Button>
-        );
-      })}
-    </div>
+      multiple
+      maxDisplayedItems={2}
+      leftIcon={<LuListFilter />}
+      placeholder={t`All work`}
+      emptyMessage={t`Nothing matches.`}
+      className="w-full rounded-full sm:w-72"
+      options={offered.map((count) => ({
+        value: count.type,
+        label: `${workLabel(count.type)} · ${countIn(count, types)}`,
+        textValue: workLabel(count.type),
+      }))}
+      value={shown}
+      onValueChange={onChange}
+    />
   );
 }
 
@@ -307,48 +290,53 @@ function partsOf(item: BaseItemDto, shown: string[]): string[] {
 }
 
 /**
- * The title's IMDb score, else the one score its server calls the community's.
- * A list item has none, so each row asks for its title once it nears the
- * screen, top to bottom, and the score shows as it comes.
+ * The title's IMDb score, else the one score its server calls the community's,
+ * with a star as IMDb lists it. A list item has none, so each row asks for its
+ * title once it nears the screen, top to bottom, and the score shows as it
+ * comes.
  */
 function CreditScore({ item }: { item: BaseItemDto }) {
-  const [box, near] = useNear<HTMLDivElement>();
+  const [box, near] = useNear<HTMLParagraphElement>();
   const full = useItem(near ? (item.Id ?? '') : '');
   const scores = scoresOf(full.data ?? item);
   const score =
     scores.find((s) => s.source === 'imdb') ??
     scores.find((s) => s.source === 'community');
   return (
-    <div
+    <p
       ref={box}
       data-ui="credit-score"
-      className="flex min-w-14 flex-none justify-end text-sm"
+      className="flex h-5 items-center text-sm text-gray-300"
     >
       {score ? (
-        <span className="animate-in fade-in-0 duration-500">
-          <ScoreBadge score={score} />
+        <span className="inline-flex items-center gap-1 tabular-nums animate-in fade-in-0 duration-500">
+          <IoStar aria-hidden className="text-amber-400" />
+          <span className="sr-only">{t`Rating`}</span>
+          {((score.value / score.scale) * 10).toFixed(1)}
         </span>
       ) : (
-        near && full.isLoading && <Skeleton className="h-4 w-10 rounded" />
+        near && full.isLoading && <Skeleton className="h-3.5 w-12 rounded" />
       )}
-    </div>
+    </p>
   );
 }
 
+/** As IMDb lists a person's work: poster, title, score and part, then the year. */
 function CreditRow({ item, shown }: { item: BaseItemDto; shown: string[] }) {
   const { client } = useSession();
-  const poster = posterUrl(client, item, { maxWidth: 96 });
+  const poster = posterUrl(client, item, { maxWidth: 112 });
   const parts = partsOf(item, shown);
+  const year = yearOf(item);
   return (
     <li>
       <Anchor
         data-ui="credit"
         href={href(itemPath(item))}
-        className="group flex items-center gap-4 rounded-lg px-2 py-2 transition-colors hover:bg-white/5 focus-visible:bg-white/10"
+        className="group flex items-center gap-4 rounded-lg px-2 py-3 transition-colors hover:bg-white/5 focus-visible:bg-white/10"
       >
         <div
           data-ui="credit-poster"
-          className="aspect-[2/3] w-10 flex-none overflow-hidden rounded bg-gray-900 ring-1 ring-white/10 sm:w-12"
+          className="aspect-[2/3] w-12 flex-none overflow-hidden rounded-lg bg-gray-900 ring-1 ring-white/10 sm:w-14"
         >
           {poster && (
             <CachedImage
@@ -359,10 +347,10 @@ function CreditRow({ item, shown }: { item: BaseItemDto; shown: string[] }) {
             />
           )}
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 space-y-0.5">
           <p
             data-ui="credit-title"
-            className="truncate font-medium group-hover:underline"
+            className="truncate font-semibold group-hover:underline"
           >
             {item.Name}
             {item.Type === 'Series' && (
@@ -371,6 +359,7 @@ function CreditRow({ item, shown }: { item: BaseItemDto; shown: string[] }) {
               </span>
             )}
           </p>
+          <CreditScore item={item} />
           {parts.length > 0 && (
             <p
               data-ui="credit-part"
@@ -380,7 +369,19 @@ function CreditRow({ item, shown }: { item: BaseItemDto; shown: string[] }) {
             </p>
           )}
         </div>
-        <CreditScore item={item} />
+        {year && (
+          <span
+            data-ui="credit-year"
+            className="flex-none text-sm tabular-nums text-[--muted]"
+          >
+            {year}
+          </span>
+        )}
+        <BiInfoCircle
+          aria-hidden
+          data-ui="credit-info"
+          className="size-6 flex-none text-brand-400"
+        />
       </Anchor>
     </li>
   );
@@ -437,14 +438,16 @@ function Filmography({
             </span>
           )}
         </h2>
-        <KindTabs types={types} onChange={setTypes} />
+        <div className="flex flex-wrap items-center gap-3 max-sm:w-full">
+          <KindTabs types={types} onChange={setTypes} />
+          <WorkFilters
+            credits={credits}
+            types={types}
+            shown={shown}
+            onChange={setShown}
+          />
+        </div>
       </div>
-      <WorkFilters
-        credits={credits}
-        types={types}
-        shown={shown}
-        onChange={setShown}
-      />
       {pages.isError ? (
         <LuffyError title={t`Could not load their work`} />
       ) : pages.isLoading || !person ? (
@@ -471,7 +474,7 @@ function Filmography({
                   </span>
                 )}
               </h3>
-              <ol className="divide-y divide-white/5 border-t border-white/10 sm:border-t-0">
+              <ol className="divide-y divide-white/10 border-t border-white/10 sm:border-t-0">
                 {titles.map((item) => (
                   <CreditRow key={item.Id} item={item} shown={shown} />
                 ))}

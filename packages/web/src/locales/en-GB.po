@@ -552,6 +552,10 @@ msgstr "All on"
 msgid "All playlists"
 msgstr "All playlists"
 
+#: src/app/person/page.tsx
+msgid "All work"
+msgstr "All work"
+
 #: src/lib/downloads/index.ts
 msgid "Already downloaded or on the way"
 msgstr "Already downloaded or on the way"
@@ -2889,6 +2893,7 @@ msgstr "Nothing marked as a favourite yet."
 
 #: src/app/discover/page.tsx
 #: src/app/live-tv/page.tsx
+#: src/app/person/page.tsx
 #: src/app/settings/_components/licenses.tsx
 #: src/app/settings/_components/version-settings.tsx
 #: src/app/settings/audio.tsx
@@ -3737,6 +3742,7 @@ msgstr "Rate"
 msgid "Rate season"
 msgstr "Rate season"
 
+#: src/app/person/page.tsx
 #: src/components/media/scores.tsx
 #: src/components/media/sort-picker.tsx
 msgid "Rating"
