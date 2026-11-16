@@ -528,7 +528,8 @@ export class TMDBMetadata {
     let releaseDate: string | undefined;
     let yearEnd: string | undefined;
     let seasons:
-      Array<{ season_number: number; episode_count: number }> | undefined;
+      | Array<{ season_number: number; episode_count: number }>
+      | undefined;
     let allTitles: MetadataTitle[] = [];
     let originalLanguage: string | undefined;
     let country: string | undefined;
