@@ -9,9 +9,9 @@ import { useSession } from '@/lib/jellyfin/session';
 import { useItem, usePersonItems } from '@/lib/jellyfin/queries';
 import { posterUrl } from '@/lib/artwork/urls';
 import { dateFormat, yearsBetween } from '@/lib/format';
-import { useInView } from '@/hooks/use-in-view';
+import { useInView, useNear } from '@/hooks/use-in-view';
 import { PageBody, PageMessage } from '@/components/shell/page';
-import { Scores } from '@/components/media/scores';
+import { ScoreBadge, scoresOf } from '@/components/media/scores';
 import { Anchor } from '@/components/anchor';
 import { href, itemPath } from '@/lib/paths';
 import { useSearchParam } from '@/hooks/use-search-param';
@@ -298,6 +298,35 @@ function partsOf(item: BaseItemDto, shown: string[]): string[] {
   return [...new Set(parts.filter(Boolean))];
 }
 
+/**
+ * The title's IMDb score, else the one score its server calls the community's.
+ * A list item has none, so each row asks for its title once it nears the
+ * screen, top to bottom, and the score shows as it comes.
+ */
+function CreditScore({ item }: { item: BaseItemDto }) {
+  const [box, near] = useNear<HTMLDivElement>();
+  const full = useItem(near ? (item.Id ?? '') : '');
+  const scores = scoresOf(full.data ?? item);
+  const score =
+    scores.find((s) => s.source === 'imdb') ??
+    scores.find((s) => s.source === 'community');
+  return (
+    <div
+      ref={box}
+      data-ui="credit-score"
+      className="flex min-w-14 flex-none justify-end text-sm"
+    >
+      {score ? (
+        <span className="animate-in fade-in-0 duration-500">
+          <ScoreBadge score={score} />
+        </span>
+      ) : (
+        near && full.isLoading && <Skeleton className="h-4 w-10 rounded" />
+      )}
+    </div>
+  );
+}
+
 function CreditRow({ item, shown }: { item: BaseItemDto; shown: string[] }) {
   const { client } = useSession();
   const poster = posterUrl(client, item, { maxWidth: 96 });
@@ -339,13 +368,11 @@ function CreditRow({ item, shown }: { item: BaseItemDto; shown: string[] }) {
               data-ui="credit-part"
               className="truncate text-sm text-[--muted]"
             >
-              {parts.join(' · ')}
+              {parts.join(', ')}
             </p>
           )}
         </div>
-        <div data-ui="credit-score" className="flex-none text-sm">
-          <Scores item={item} max={1} />
-        </div>
+        <CreditScore item={item} />
       </Anchor>
     </li>
   );

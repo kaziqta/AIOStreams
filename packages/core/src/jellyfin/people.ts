@@ -350,15 +350,7 @@ export async function filmographyPage(
     const preview = previews[i];
     if (!preview) return [];
     return [
-      {
-        preview: credit.rating
-          ? ({
-              ...preview,
-              ratings: [{ source: 'tmdb', value: credit.rating, scale: 10 }],
-            } as MetaPreview)
-          : preview,
-        parts: creditedParts(credit),
-      },
+      { preview, parts: creditedParts(credit) },
     ];
   });
   return {

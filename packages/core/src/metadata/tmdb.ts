@@ -33,8 +33,6 @@ const AUTHORISATION_CACHE_TTL = 2 * 24 * 60 * 60; // 2 days
 const EPISODE_CACHE_TTL = 6 * 60 * 60; // 6 hours
 const SEARCH_CACHE_TTL = 7 * 24 * 60 * 60; // 7 days
 const PERSON_CACHE_TTL = 3 * 24 * 60 * 60; // 3 days, credits grow
-/** Fewer votes than this make an average too noisy to show. */
-const MIN_RATING_VOTES = 10;
 const RECOMMENDATION_CACHE_TTL = 24 * 60 * 60; // 1 day
 
 // Zod schemas for API responses
@@ -203,7 +201,6 @@ const PersonCreditSchema = z.looseObject({
   genre_ids: z.array(z.number()).optional(),
   popularity: z.number().optional(),
   vote_count: z.number().optional(),
-  vote_average: z.number().optional(),
   character: z.string().nullable().optional(),
   job: z.string().nullable().optional(),
   department: z.string().nullable().optional(),
@@ -274,8 +271,6 @@ export interface TMDBPersonCredit extends TMDBTitle {
   /** Characters played and jobs held, one entry per credit. */
   roles: string[];
   parts: TMDBCreditPart[];
-  /** TMDB's users' average, out of 10, where enough have voted. */
-  rating?: number;
 }
 
 export interface TMDBPersonResult {
@@ -904,10 +899,6 @@ export class TMDBMetadata {
         voteCount: credit.vote_count ?? 0,
         roles: role ? [role] : [],
         parts: [part],
-        ...(credit.vote_average &&
-          (credit.vote_count ?? 0) >= MIN_RATING_VOTES && {
-            rating: credit.vote_average,
-          }),
       });
     }
     const person: TMDBPerson = {
