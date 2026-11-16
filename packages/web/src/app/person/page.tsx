@@ -232,11 +232,11 @@ function WorkFilters({
       data-ui="work-filters"
       aria-label={t`Kinds of work`}
       multiple
-      maxDisplayedItems={2}
+      maxDisplayedItems={1}
       leftIcon={<LuListFilter />}
       placeholder={t`All work`}
       emptyMessage={t`Nothing matches.`}
-      className="w-full rounded-full sm:w-72"
+      className="min-w-0 flex-1 rounded-full sm:w-56 sm:flex-none"
       options={offered.map((count) => ({
         value: count.type,
         label: `${workLabel(count.type)} · ${countIn(count, types)}`,
@@ -438,7 +438,8 @@ function Filmography({
             </span>
           )}
         </h2>
-        <div className="flex flex-wrap items-center gap-3 max-sm:w-full">
+        {/* The tabs and the picker stay on one line together. */}
+        <div className="flex flex-nowrap items-center gap-3 max-sm:w-full">
           <KindTabs types={types} onChange={setTypes} />
           <WorkFilters
             credits={credits}
