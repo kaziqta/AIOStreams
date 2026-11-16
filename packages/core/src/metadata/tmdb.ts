@@ -33,6 +33,8 @@ const AUTHORISATION_CACHE_TTL = 2 * 24 * 60 * 60; // 2 days
 const EPISODE_CACHE_TTL = 6 * 60 * 60; // 6 hours
 const SEARCH_CACHE_TTL = 7 * 24 * 60 * 60; // 7 days
 const PERSON_CACHE_TTL = 3 * 24 * 60 * 60; // 3 days, credits grow
+/** Fewer votes than this make an average too noisy to show. */
+const MIN_RATING_VOTES = 10;
 const RECOMMENDATION_CACHE_TTL = 24 * 60 * 60; // 1 day
 
 // Zod schemas for API responses
@@ -201,8 +203,10 @@ const PersonCreditSchema = z.looseObject({
   genre_ids: z.array(z.number()).optional(),
   popularity: z.number().optional(),
   vote_count: z.number().optional(),
+  vote_average: z.number().optional(),
   character: z.string().nullable().optional(),
   job: z.string().nullable().optional(),
+  department: z.string().nullable().optional(),
 });
 
 const PersonDetailsSchema = z.looseObject({
@@ -260,9 +264,18 @@ export interface TMDBTitle {
   voteCount: number;
 }
 
+/** One credit on a title: the department, `Acting` for the cast, and the character played or job held. */
+export interface TMDBCreditPart {
+  department: string;
+  role?: string;
+}
+
 export interface TMDBPersonCredit extends TMDBTitle {
   /** Characters played and jobs held, one entry per credit. */
   roles: string[];
+  parts: TMDBCreditPart[];
+  /** TMDB's users' average, out of 10, where enough have voted. */
+  rating?: number;
 }
 
 export interface TMDBPersonResult {
@@ -322,7 +335,7 @@ export class TMDBMetadata {
   private static readonly personSearchCache: Cache<string, TMDBPersonResult[]> =
     Cache.getInstance<string, TMDBPersonResult[]>('tmdb_person_search');
   private static readonly personCache: Cache<string, TMDBPerson> =
-    Cache.getInstance<string, TMDBPerson>('tmdb_person');
+    Cache.getInstance<string, TMDBPerson>('tmdb_person_v2');
   private static readonly recommendationCache: Cache<string, TMDBTitle[]> =
     Cache.getInstance<string, TMDBTitle[]>('tmdb_recommendations');
   private static readonly imdbIdCache: Cache<string, string> =
@@ -515,8 +528,7 @@ export class TMDBMetadata {
     let releaseDate: string | undefined;
     let yearEnd: string | undefined;
     let seasons:
-      | Array<{ season_number: number; episode_count: number }>
-      | undefined;
+      Array<{ season_number: number; episode_count: number }> | undefined;
     let allTitles: MetadataTitle[] = [];
     let originalLanguage: string | undefined;
     let country: string | undefined;
@@ -851,10 +863,12 @@ export class TMDBMetadata {
       ...(data.combined_credits?.cast ?? []).map((c) => ({
         ...c,
         role: c.character,
+        department: 'Acting',
       })),
       ...(data.combined_credits?.crew ?? []).map((c) => ({
         ...c,
         role: c.job,
+        department: c.department || 'Crew',
       })),
     ];
     const byTitle = new Map<string, TMDBPersonCredit>();
@@ -864,9 +878,16 @@ export class TMDBMetadata {
       if (!title) continue;
       const role = credit.role?.trim();
       const titleKey = `${credit.media_type}:${credit.id}`;
+      const part = { department: credit.department, ...(role && { role }) };
       const existing = byTitle.get(titleKey);
       if (existing) {
         if (role && !existing.roles.includes(role)) existing.roles.push(role);
+        if (
+          !existing.parts.some(
+            (p) => p.department === part.department && p.role === part.role
+          )
+        )
+          existing.parts.push(part);
         continue;
       }
       byTitle.set(titleKey, {
@@ -881,6 +902,11 @@ export class TMDBMetadata {
         popularity: credit.popularity ?? 0,
         voteCount: credit.vote_count ?? 0,
         roles: role ? [role] : [],
+        parts: [part],
+        ...(credit.vote_average &&
+          (credit.vote_count ?? 0) >= MIN_RATING_VOTES && {
+            rating: credit.vote_average,
+          }),
       });
     }
     const person: TMDBPerson = {

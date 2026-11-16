@@ -9,7 +9,12 @@ import type {
 import { providerIdsFrom, toIso } from './enrichment.js';
 import { imageTagsFor, rememberImages } from './images.js';
 import { searchPersonCatalogs } from './library.js';
-import { isoDate, TMDB_IMAGES, titlePreviews, tmdbFor } from './tmdb-titles.js';
+import {
+  isoDate,
+  TMDB_IMAGES,
+  titlePreviewsInOrder,
+  tmdbFor,
+} from './tmdb-titles.js';
 import type { JellyfinItem, PersonDescriptor } from './types.js';
 
 const logger = createLogger('jellyfin');
@@ -40,10 +45,72 @@ interface PersonDetails {
 
 export interface FilmographyQuery {
   kinds?: FilmographyKind[];
+  /** Jellyfin person kinds, such as Director; a title is kept for any of them. */
+  personTypes?: string[];
   sortBy: string[];
   descending?: boolean;
   startIndex: number;
   limit: number;
+}
+
+/** What a person did on a title: a Jellyfin person kind, and the character played or job held. */
+export interface CreditedPart {
+  type: string;
+  role?: string;
+}
+
+/** How many titles a person has of a kind of work, by movies and shows. */
+export interface CreditCount {
+  type: string;
+  movies: number;
+  series: number;
+}
+
+/**
+ * The Jellyfin person kind of a TMDB department and job, the kinds title crews
+ * are sent as; a department no kind covers keeps its own name.
+ */
+export function personKindOf(department: string, job?: string): string {
+  switch (department) {
+    case 'Acting':
+      return 'Actor';
+    case 'Directing':
+      return job && /^(co-)?director$/i.test(job) ? 'Director' : department;
+    case 'Writing':
+      return 'Writer';
+    case 'Sound':
+      return job && /compos|^music$/i.test(job) ? 'Composer' : department;
+    case 'Production':
+      return job && /producer/i.test(job) ? 'Producer' : department;
+    case 'Editing':
+      return 'Editor';
+    default:
+      return department;
+  }
+}
+
+/** The kind of work TMDB knows a person for, by their main department. */
+function knownKind(department: string): string {
+  switch (department) {
+    case 'Directing':
+      return 'Director';
+    case 'Sound':
+      return 'Composer';
+    case 'Production':
+      return 'Producer';
+    default:
+      return personKindOf(department);
+  }
+}
+
+/** A credit's parts, leaving out honorary ones. */
+export function creditedParts(credit: TMDBPersonCredit): CreditedPart[] {
+  return credit.parts
+    .filter((part) => !part.role || !HONORARY_JOBS.has(part.role))
+    .map((part) => ({
+      type: personKindOf(part.department, part.role),
+      ...(part.role && { role: part.role }),
+    }));
 }
 
 export async function findPerson(
@@ -154,6 +221,13 @@ export function withPersonDetails(
         : []),
     ],
   };
+  // The kinds of work the page can filter by, and the one to start on.
+  const summary = creditSummary(found);
+  if (summary.credits.length)
+    out.aiostreams = {
+      ...(item.aiostreams as object | undefined),
+      ...summary,
+    };
   const tags = item.ImageTags as Record<string, string> | undefined;
   if (details.photo && !tags?.Primary) {
     rememberImages(item.Id, { Primary: details.photo });
@@ -167,20 +241,52 @@ function kindOf(type: string): FilmographyKind {
   return type === 'movie' ? 'movie' : 'series';
 }
 
-/** What a person worked on, without guest spots and honorary credits. */
-function tmdbCredits(
+/** What a person worked on, without guest spots and honorary credits; with `types`, only that kind of work. */
+export function tmdbCredits(
   person: TMDBPerson,
-  kinds?: FilmographyKind[]
+  kinds?: FilmographyKind[],
+  types?: string[]
 ): TMDBPersonCredit[] {
   return person.credits
     .filter((credit) => {
       if (kinds && !kinds.includes(kindOf(credit.mediaType))) return false;
       if (credit.genreIds.some((g) => TALK_AND_NEWS.has(g))) return false;
+      if (
+        credit.roles.length &&
+        credit.roles.every((r) => HONORARY_JOBS.has(r))
+      )
+        return false;
       return (
-        !credit.roles.length || credit.roles.some((r) => !HONORARY_JOBS.has(r))
+        !types?.length ||
+        creditedParts(credit).some((part) => types.includes(part.type))
       );
     })
     .sort((a, b) => b.popularity - a.popularity);
+}
+
+/** The person's kinds of work with their titles counted, most first, and the one TMDB knows them for. */
+export function creditSummary(found: FoundPerson): {
+  credits: CreditCount[];
+  knownFor?: string;
+} {
+  if ('meta' in found) return { credits: [] };
+  const counts = new Map<string, CreditCount>();
+  for (const credit of tmdbCredits(found.person)) {
+    const series = kindOf(credit.mediaType) === 'series';
+    for (const type of new Set(creditedParts(credit).map((p) => p.type))) {
+      const count = counts.get(type) ?? { type, movies: 0, series: 0 };
+      if (series) count.series++;
+      else count.movies++;
+      counts.set(type, count);
+    }
+  }
+  const department = found.person.department;
+  return {
+    credits: [...counts.values()].sort(
+      (a, b) => b.movies + b.series - (a.movies + a.series)
+    ),
+    ...(department && { knownFor: knownKind(department) }),
+  };
 }
 
 /** Jellyfin's sort keys a credit can answer; anything else keeps the given order. */
@@ -211,7 +317,12 @@ export async function filmographyPage(
   engine: AIOStreams,
   found: FoundPerson,
   q: FilmographyQuery
-): Promise<{ previews: MetaPreview[]; total: number }> {
+): Promise<{
+  previews: MetaPreview[];
+  total: number;
+  /** Beside each preview, what the person did on it, where that's known. */
+  parts?: CreditedPart[][];
+}> {
   const end = q.startIndex + q.limit;
   if ('meta' in found) {
     const credits = (found.meta.credits ?? []) as MetaPreview[];
@@ -229,16 +340,30 @@ export async function filmographyPage(
     return { previews: sorted.slice(q.startIndex, end), total: sorted.length };
   }
   const sorted = sortCredits(
-    tmdbCredits(found.person, q.kinds),
+    tmdbCredits(found.person, q.kinds, q.personTypes),
     (c) => ({ date: c.date, name: c.title }),
     q
   );
+  const page = sorted.slice(q.startIndex, end);
+  const previews = await titlePreviewsInOrder(engine, found.tmdb, page);
+  const kept = page.flatMap((credit, i) => {
+    const preview = previews[i];
+    if (!preview) return [];
+    return [
+      {
+        preview: credit.rating
+          ? ({
+              ...preview,
+              ratings: [{ source: 'tmdb', value: credit.rating, scale: 10 }],
+            } as MetaPreview)
+          : preview,
+        parts: creditedParts(credit),
+      },
+    ];
+  });
   return {
-    previews: await titlePreviews(
-      engine,
-      found.tmdb,
-      sorted.slice(q.startIndex, end)
-    ),
+    previews: kept.map((k) => k.preview),
     total: sorted.length,
+    parts: kept.map((k) => k.parts),
   };
 }

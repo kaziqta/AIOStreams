@@ -501,6 +501,7 @@ async function handleItems(
   const wantsResumable = filters.includes('isresumable');
   const recursive = qb(req, 'Recursive') ?? false;
   const personIds = qlist(req, 'PersonIds');
+  const personTypes = qlist(req, 'PersonTypes');
 
   if (ids.length) {
     // Resolving runs the stream pipeline, so a lookup of several ids never does.
@@ -638,12 +639,24 @@ async function handleItems(
               types.has(k)
             )
           : undefined,
+        personTypes: personTypes.length ? personTypes : undefined,
         sortBy: qlist(req, 'SortBy'),
         descending: sortDescending(req),
         startIndex,
         limit,
       });
       const items = await itemsFromPreviews(ctx, page.previews);
+      // The person's own part in each, as Jellyfin lists people on an item.
+      const id = personIds[0] ?? parentId;
+      if (page.parts && id && person)
+        items.forEach((item, i) => {
+          item.People = (page.parts![i] ?? []).map((part) => ({
+            Id: id,
+            Name: person.n,
+            Type: part.type,
+            ...(part.role && { Role: part.role }),
+          }));
+        });
       send(req, res, excludeTypes(req, items), page.total, startIndex);
       return;
     }
