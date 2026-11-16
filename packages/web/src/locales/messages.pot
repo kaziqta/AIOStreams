@@ -54,28 +54,12 @@ msgstr ""
 msgid "{count, plural, one {Added # quick filter} other {Added # quick filters}}"
 msgstr ""
 
-#: src/components/media/people.tsx
-msgid "{count, plural, one {Creator} other {Creators}}"
-msgstr ""
-
-#: src/components/media/people.tsx
-msgid "{count, plural, one {Director} other {Directors}}"
-msgstr ""
-
 #: src/lib/downloads/index.ts
 msgid "{count, plural, one {Download added} other {# downloads added}}"
 msgstr ""
 
-#: src/components/media/people.tsx
-msgid "{count, plural, one {Producer} other {Producers}}"
-msgstr ""
-
 #: src/app/item/_components/trailers.tsx
 msgid "{count, plural, one {Trailer} other {Trailers}}"
-msgstr ""
-
-#: src/components/media/people.tsx
-msgid "{count, plural, one {Writer} other {Writers}}"
 msgstr ""
 
 #: src/app/downloads/page.tsx
@@ -160,10 +144,6 @@ msgstr ""
 #. Minutes, as in 45m
 #: src/lib/format.ts
 msgid "{minutes}m"
-msgstr ""
-
-#: src/components/media/people.tsx
-msgid "{more, plural, one {and # more} other {and # more}}"
 msgstr ""
 
 #: src/app/history/page.tsx
@@ -1303,6 +1283,10 @@ msgstr ""
 msgid "Create"
 msgstr ""
 
+#: src/components/media/people.tsx
+msgid "Creator"
+msgstr ""
+
 #: src/app/settings/playback.tsx
 msgid "Credits"
 msgstr ""
@@ -1470,6 +1454,10 @@ msgstr ""
 
 #: src/app/person/page.tsx
 msgid "Directing"
+msgstr ""
+
+#: src/components/media/people.tsx
+msgid "Director"
 msgstr ""
 
 #: src/app/settings/apps.tsx
@@ -2602,8 +2590,8 @@ msgstr ""
 msgid "mpv.conf, input.conf, scripts and shaders in this folder apply to the built-in mpv."
 msgstr ""
 
+#. A crew member’s job: the score
 #. A person’s work on scores
-#. Heading over who wrote a title’s score
 #: src/app/person/page.tsx
 #: src/components/media/people.tsx
 msgid "Music"
@@ -3658,6 +3646,10 @@ msgstr ""
 #: src/app/trailer/page.tsx
 #: src/features/player/controls.tsx
 msgid "Previous trailer"
+msgstr ""
+
+#: src/components/media/people.tsx
+msgid "Producer"
 msgstr ""
 
 #: src/app/person/page.tsx
@@ -5912,6 +5904,10 @@ msgstr ""
 
 #: src/app/settings/_components/version-settings.tsx
 msgid "Words or /pattern/"
+msgstr ""
+
+#: src/components/media/people.tsx
+msgid "Writer"
 msgstr ""
 
 #: src/app/person/page.tsx

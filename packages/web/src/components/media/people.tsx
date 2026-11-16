@@ -1,5 +1,5 @@
-import React from 'react';
-import { plural, t } from '@lingui/core/macro';
+import { t } from '@lingui/core/macro';
+import { formatLocale } from '@/lib/i18n';
 import { useSession } from '@/lib/jellyfin/session';
 import { personImageUrl } from '@/lib/artwork/urls';
 import { href, to } from '@/lib/paths';
@@ -20,9 +20,12 @@ function initials(name: string): string {
 export function PersonCard({
   person,
   detail,
+  role,
 }: {
   person: BaseItemPerson;
   detail?: string | null;
+  /** The kind of work their page opens on, such as Director. */
+  role?: string;
 }) {
   const { client } = useSession();
   const image = personImageUrl(client, person);
@@ -65,7 +68,7 @@ export function PersonCard({
   return person.Id ? (
     <Anchor
       data-ui="person-card"
-      href={href(to.person(person.Id))}
+      href={href(to.person(person.Id, role))}
       data-focus="own"
       className="group block text-center"
     >
@@ -85,15 +88,16 @@ export function PeopleRow({
 }: {
   id: string;
   title: string;
-  people: { person: BaseItemPerson; detail?: string | null }[];
+  people: { person: BaseItemPerson; detail?: string | null; role?: string }[];
 }) {
   return (
     <MediaRow id={id} title={title} shape="square" itemClass={PERSON_WIDTH}>
-      {people.map(({ person, detail }) => (
+      {people.map(({ person, detail, role }) => (
         <PersonCard
           key={person.Id ?? person.Name}
           person={person}
           detail={detail}
+          role={role}
         />
       ))}
     </MediaRow>
@@ -107,111 +111,33 @@ const CAST = new Set(['Actor', 'GuestStar']);
 // eslint-disable-next-line lingui/no-unlocalized-strings -- Jellyfin's person kinds
 const CREW_ORDER = ['Director', 'Creator', 'Writer', 'Composer', 'Producer'];
 
-/** Names shown for one job, as a show can list dozens of producers. */
-const NAMES_PER_JOB = 6;
+const crewRank = (job: string) => {
+  const at = CREW_ORDER.indexOf(job);
+  return at < 0 ? CREW_ORDER.length : at;
+};
 
-/** A crew job's heading over `count` people, by the kinds AIOStreams sends; any other shows as the server names it. */
-function jobHeading(kind: string, count: number): string {
+/** A crew job by the kinds AIOStreams sends; any other shows as the server names it. */
+function jobLabel(kind: string): string {
   switch (kind) {
     case 'Director':
-      return plural(count, { one: 'Director', other: 'Directors' });
+      return t`Director`;
     case 'Writer':
-      return plural(count, { one: 'Writer', other: 'Writers' });
+      return t`Writer`;
     case 'Producer':
-      return plural(count, { one: 'Producer', other: 'Producers' });
+      return t`Producer`;
     case 'Composer':
-      return t({
-        comment: 'Heading over who wrote a title’s score',
-        message: 'Music',
-      });
+      return t({ comment: 'A crew member’s job: the score', message: 'Music' });
     case 'Creator':
-      return plural(count, { one: 'Creator', other: 'Creators' });
+      return t`Creator`;
     default:
       return kind;
   }
 }
 
-/** A crew member's name, opening their page on the job they did here. */
-function CrewName({ person, kind }: { person: BaseItemPerson; kind: string }) {
-  return person.Id ? (
-    <Anchor
-      data-ui="crew-name"
-      href={href(to.person(person.Id, kind))}
-      className="rounded-sm font-medium text-brand-300 hover:underline"
-    >
-      {person.Name}
-    </Anchor>
-  ) : (
-    <span data-ui="crew-name" className="font-medium">
-      {person.Name}
-    </span>
-  );
-}
-
-/** The crew by job, each name opening that person's work of the kind. */
-function Crew({ people }: { people: BaseItemPerson[] }) {
-  const jobs = new Map<string, BaseItemPerson[]>();
-  for (const person of people) {
-    const kind = String(person.Type ?? '');
-    if (!kind || !person.Name) continue;
-    const list = jobs.get(kind) ?? [];
-    const key = person.Id ?? person.Name;
-    if (!list.some((p) => (p.Id ?? p.Name) === key)) list.push(person);
-    jobs.set(kind, list);
-  }
-  const rank = (kind: string) => {
-    const at = CREW_ORDER.indexOf(kind);
-    return at < 0 ? CREW_ORDER.length : at;
-  };
-  const ordered = [...jobs].sort(([a], [b]) => rank(a) - rank(b));
-  if (!ordered.length) return null;
-  return (
-    <section data-ui="section" data-name="crew" className="space-y-3">
-      <h2 data-ui="section-title" className="text-xl font-semibold">
-        {t`Crew`}
-      </h2>
-      <dl
-        data-ui="crew"
-        className="max-w-3xl divide-y divide-white/10 border-y border-white/10"
-      >
-        {ordered.map(([kind, list]) => {
-          const more = list.length - NAMES_PER_JOB;
-          return (
-            <div
-              key={kind}
-              data-ui="crew-job"
-              data-name={kind}
-              className="flex flex-col gap-1 py-3 sm:flex-row sm:items-baseline sm:gap-6"
-            >
-              <dt className="flex-none font-semibold sm:w-32">
-                {jobHeading(kind, list.length)}
-              </dt>
-              <dd className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-                {list.slice(0, NAMES_PER_JOB).map((person, i) => (
-                  <React.Fragment key={person.Id ?? person.Name}>
-                    {i > 0 && (
-                      <span aria-hidden className="text-[--muted]">
-                        ·
-                      </span>
-                    )}
-                    <CrewName person={person} kind={kind} />
-                  </React.Fragment>
-                ))}
-                {more > 0 && (
-                  <span className="text-sm text-[--muted]">
-                    {plural(more, { one: 'and # more', other: 'and # more' })}
-                  </span>
-                )}
-              </dd>
-            </div>
-          );
-        })}
-      </dl>
-    </section>
-  );
-}
-
-/** The cast with their characters, then the crew by job. */
+/**
+ * The cast with their characters, then the crew by their main job, with every
+ * job they held; each opens their page on the job they did here.
+ */
 export function CastAndCrew({
   people,
 }: {
@@ -219,6 +145,19 @@ export function CastAndCrew({
 }) {
   const all = people ?? [];
   const cast = all.filter((p) => CAST.has(String(p.Type)));
+  const crew = new Map<string, { person: BaseItemPerson; jobs: string[] }>();
+  for (const person of all) {
+    if (CAST.has(String(person.Type))) continue;
+    const key = person.Id ?? person.Name ?? '';
+    const entry = crew.get(key) ?? { person, jobs: [] };
+    const job = String(person.Type ?? '');
+    if (job && !entry.jobs.includes(job)) entry.jobs.push(job);
+    crew.set(key, entry);
+  }
+  const list = new Intl.ListFormat(formatLocale(), {
+    style: 'narrow',
+    type: 'unit',
+  });
   return (
     <>
       <PeopleRow
@@ -228,7 +167,21 @@ export function CastAndCrew({
           .slice(0, 40)
           .map((person) => ({ person, detail: person.Role }))}
       />
-      <Crew people={all.filter((p) => !CAST.has(String(p.Type)))} />
+      <PeopleRow
+        id="crew"
+        title={t`Crew`}
+        people={[...crew.values()]
+          .map(({ person, jobs }) => ({
+            person,
+            jobs: [...jobs].sort((a, b) => crewRank(a) - crewRank(b)),
+          }))
+          .sort((a, b) => crewRank(a.jobs[0]) - crewRank(b.jobs[0]))
+          .map(({ person, jobs }) => ({
+            person,
+            detail: list.format(jobs.map(jobLabel)),
+            role: jobs[0],
+          }))}
+      />
     </>
   );
 }
