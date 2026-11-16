@@ -655,6 +655,8 @@ async function handleItems(
             Name: person.n,
             Type: part.type,
             ...(part.role && { Role: part.role }),
+            // Not a Jellyfin field: a show's episodes in this part.
+            ...(part.episodes && { EpisodeCount: part.episodes }),
           }));
         });
       send(req, res, excludeTypes(req, items), page.total, startIndex);

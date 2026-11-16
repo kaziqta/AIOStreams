@@ -57,6 +57,8 @@ export interface FilmographyQuery {
 export interface CreditedPart {
   type: string;
   role?: string;
+  /** On a show, the episodes this part covered. */
+  episodes?: number;
 }
 
 /** How many titles a person has of a kind of work, by movies and shows. */
@@ -110,6 +112,7 @@ export function creditedParts(credit: TMDBPersonCredit): CreditedPart[] {
     .map((part) => ({
       type: personKindOf(part.department, part.role),
       ...(part.role && { role: part.role }),
+      ...(part.episodes && { episodes: part.episodes }),
     }));
 }
 

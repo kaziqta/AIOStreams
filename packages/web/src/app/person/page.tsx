@@ -1,5 +1,5 @@
 import React from 'react';
-import { t } from '@lingui/core/macro';
+import { plural, t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import { Button } from '@aiostreams/ui/button';
 import { cn } from '@aiostreams/ui/core/styling';
@@ -292,9 +292,17 @@ function partsOf(item: BaseItemDto, shown: string[]): string[] {
   const matching = shown.length
     ? people.filter((p) => shown.includes(String(p.Type)))
     : people;
-  const parts = (matching.length ? matching : people).map(
-    (p) => p.Role || workLabel(String(p.Type ?? ''))
-  );
+  const parts = (matching.length ? matching : people).map((p) => {
+    const part = p.Role || workLabel(String(p.Type ?? ''));
+    // AIOStreams counts a show's episodes in each part, as IMDb lists them.
+    const count = (p as { EpisodeCount?: number }).EpisodeCount;
+    if (!part || !count) return part;
+    const episodes = plural(count, { one: '# episode', other: '# episodes' });
+    return t({
+      comment: 'A person’s part on a show and how many episodes it covered',
+      message: `${part} (${episodes})`,
+    });
+  });
   return [...new Set(parts.filter(Boolean))];
 }
 

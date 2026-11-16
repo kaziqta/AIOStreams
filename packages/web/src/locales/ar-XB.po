@@ -31,6 +31,10 @@ msgstr ""
 msgid "{count, plural, one {# badge} other {# badges}}"
 msgstr ""
 
+#: src/app/person/page.tsx
+msgid "{count, plural, one {# episode} other {# episodes}}"
+msgstr ""
+
 #: src/app/settings/playback.tsx
 msgid "{count, plural, one {# minute} other {# minutes}}"
 msgstr ""
@@ -193,6 +197,11 @@ msgstr ""
 
 #: src/app/settings/_components/version-settings.tsx
 msgid "{packs} and {own}"
+msgstr ""
+
+#. A person’s part on a show and how many episodes it covered
+#: src/app/person/page.tsx
+msgid "{part} ({episodes})"
 msgstr ""
 
 #: src/app/settings/playback.tsx

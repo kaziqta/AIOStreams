@@ -204,6 +204,7 @@ const PersonCreditSchema = z.looseObject({
   character: z.string().nullable().optional(),
   job: z.string().nullable().optional(),
   department: z.string().nullable().optional(),
+  episode_count: z.number().nullable().optional(),
 });
 
 const PersonDetailsSchema = z.looseObject({
@@ -265,6 +266,8 @@ export interface TMDBTitle {
 export interface TMDBCreditPart {
   department: string;
   role?: string;
+  /** On a show, the episodes this part covered. */
+  episodes?: number;
 }
 
 export interface TMDBPersonCredit extends TMDBTitle {
@@ -874,7 +877,11 @@ export class TMDBMetadata {
       if (!title) continue;
       const role = credit.role?.trim();
       const titleKey = `${credit.media_type}:${credit.id}`;
-      const part = { department: credit.department, ...(role && { role }) };
+      const part = {
+        department: credit.department,
+        ...(role && { role }),
+        ...(credit.episode_count && { episodes: credit.episode_count }),
+      };
       const existing = byTitle.get(titleKey);
       if (existing) {
         if (role && !existing.roles.includes(role)) existing.roles.push(role);

@@ -31,6 +31,10 @@ msgstr "{cleared, plural, one {Removed # title from the history} other {Removed 
 msgid "{count, plural, one {# badge} other {# badges}}"
 msgstr "{count, plural, one {# badge} other {# badges}}"
 
+#: src/app/person/page.tsx
+msgid "{count, plural, one {# episode} other {# episodes}}"
+msgstr "{count, plural, one {# episode} other {# episodes}}"
+
 #: src/app/settings/playback.tsx
 msgid "{count, plural, one {# minute} other {# minutes}}"
 msgstr "{count, plural, one {# minute} other {# minutes}}"
@@ -194,6 +198,11 @@ msgstr "{packCount, plural, one {# pack} other {# packs}}"
 #: src/app/settings/_components/version-settings.tsx
 msgid "{packs} and {own}"
 msgstr "{packs} and {own}"
+
+#. A person’s part on a show and how many episodes it covered
+#: src/app/person/page.tsx
+msgid "{part} ({episodes})"
+msgstr "{part} ({episodes})"
 
 #: src/app/settings/playback.tsx
 msgid "{r}×"
