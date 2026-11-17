@@ -429,7 +429,7 @@ function Filmography({
   );
   return (
     <section data-ui="section" data-name="filmography" className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="space-y-4">
         <h2 data-ui="section-title" className="text-xl font-semibold">
           <Trans>Filmography</Trans>
           {total != null && (
@@ -438,15 +438,21 @@ function Filmography({
             </span>
           )}
         </h2>
-        {/* The tabs and the picker stay on one line together. */}
-        <div className="flex flex-nowrap items-center gap-3 max-sm:w-full">
-          <KindTabs types={types} onChange={setTypes} />
-          <WorkFilters
-            credits={credits}
-            types={types}
-            shown={shown}
-            onChange={setShown}
-          />
+        {/* A line of their own at the start, the picker first, so a remote
+            coming down the page meets it first and the count coming in beside
+            the title moves nothing. Both come with the person, in room kept. */}
+        <div className="flex min-h-10 flex-nowrap items-center gap-3">
+          {person && (
+            <>
+              <WorkFilters
+                credits={credits}
+                types={types}
+                shown={shown}
+                onChange={setShown}
+              />
+              <KindTabs types={types} onChange={setTypes} />
+            </>
+          )}
         </div>
       </div>
       {pages.isError ? (
