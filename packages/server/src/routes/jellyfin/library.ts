@@ -11,6 +11,7 @@ import {
   recommendedPreviews,
   searchPeople,
   similarPreviews,
+  withComposers,
   type FilmographyKind,
   Cache,
   collectionMembers,
@@ -1405,7 +1406,7 @@ router.get(
       res.status(404).json({ Message: 'Item not found' });
       return;
     }
-    res.json(stripInternal(item));
+    res.json(stripInternal(await withComposers(ctx.userData, item)));
   })
 );
 

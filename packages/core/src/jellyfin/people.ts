@@ -6,6 +6,8 @@ import type {
   TMDBPerson,
   TMDBPersonCredit,
 } from '../metadata/tmdb.js';
+import { IdMappingDataset } from '../metadata/id-mappings.js';
+import { peopleDtos } from './dto.js';
 import { providerIdsFrom, toIso } from './enrichment.js';
 import { imageTagsFor, rememberImages } from './images.js';
 import { searchPersonCatalogs } from './library.js';
@@ -197,6 +199,64 @@ function detailsOf(found: FoundPerson): PersonDetails {
   };
 }
 
+/* A title's page is not kept waiting on TMDB; a slow answer is kept for next time. */
+const COMPOSERS_WAIT_MS = 1500;
+
+/**
+ * Adds TMDB's composers to a film's or show's people where its metadata names
+ * none, as most meta addons list only cast, directors and writers.
+ */
+export async function withComposers(
+  userData: UserData,
+  item: JellyfinItem
+): Promise<JellyfinItem> {
+  if (item.Type !== 'Movie' && item.Type !== 'Series') return item;
+  const people = (item.People as { Type?: string }[] | undefined) ?? [];
+  if (people.some((p) => p.Type === 'Composer')) return item;
+  const tmdb = tmdbFor(userData);
+  const ids = (item.ProviderIds ?? {}) as Record<string, string | undefined>;
+  const kind = item.Type === 'Movie' ? 'movie' : 'series';
+  const tmdbId =
+    Number(ids.Tmdb) ||
+    (ids.Imdb
+      ? IdMappingDataset.getInstance().resolve(kind, { imdbId: ids.Imdb })
+          .tmdbId
+      : undefined);
+  if (!tmdb || !tmdbId) return item;
+  const asked = tmdb
+    .getComposers(kind === 'movie' ? 'movie' : 'tv', Number(tmdbId))
+    .catch((error) => {
+      logger.debug(
+        { tmdbId, err: error instanceof Error ? error.message : String(error) },
+        'composer lookup failed'
+      );
+      return [];
+    });
+  const composers = await Promise.race([
+    asked,
+    new Promise<[]>((resolve) =>
+      setTimeout(() => resolve([]), COMPOSERS_WAIT_MS).unref()
+    ),
+  ]);
+  if (!composers.length) return item;
+  return {
+    ...item,
+    People: [
+      ...people,
+      ...peopleDtos(
+        composers.map((c) => ({
+          name: c.name,
+          type: 'Composer' as const,
+          id: `tmdb:${c.tmdbId}`,
+          photo: c.profilePath
+            ? `${TMDB_IMAGES}w500${c.profilePath}`
+            : undefined,
+        }))
+      ),
+    ],
+  };
+}
+
 export function withPersonDetails(
   item: JellyfinItem,
   found: FoundPerson
@@ -352,9 +412,7 @@ export async function filmographyPage(
   const kept = page.flatMap((credit, i) => {
     const preview = previews[i];
     if (!preview) return [];
-    return [
-      { preview, parts: creditedParts(credit) },
-    ];
+    return [{ preview, parts: creditedParts(credit) }];
   });
   return {
     previews: kept.map((k) => k.preview),
